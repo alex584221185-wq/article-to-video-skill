@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>新视频</title>
+<link rel="stylesheet" href="lib/fonts.css">
+<link rel="stylesheet" href="lib/katex/katex.min.css">
+<link rel="stylesheet" href="lib/whiteboard.css">
+<script src="lib/katex/katex.min.js"></script>
+<script src="lib/core.js"></script>
+<script src="lib/whiteboard.js"></script>
+<script src="lib/character.js"></script>
+<script src="characters.js"></script>
+<script src="lib/media.js"></script>
+<script src="assets/manifest.js"></script>
+<script src="timeline.js"></script>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+EV.composition({
+  audio: 'audio/narration.m4a',
+  build: async ({ T }) => {
+    const b = WB.board({ T, paper: 'plain', seed: 'CHANGE-ME', lang: 'zh-CN' });
+    const W = b.W, H = b.H, CX = W / 2;   // 9:16 → 1080 × 1920
+    const INK = '#2b2b2b', ORANGE = '#FF8C42', GREEN = '#2E9E5B',
+          BLUE = '#2E86DE', GREY = '#9a9a9a', RED = '#E4572E';
+
+    // ===== 基础 helper =====
+    const C = (x, y, t, s, at, col = INK, dur = 0.34) =>
+      b.text(t, { x, y, size: s, align: 'center', valign: 'middle', color: col, at, dur });
+    const box = (x, y, w, h, at, col = INK, dur = 0.5) =>
+      b.rect(x, y, w, h, { at, dur, color: col, width: 3, rough: 0.9 });
+    const pop = (it, at, amt = 1.07, dur = 0.5) => { if (it && it.pulse) it.pulse(at, amt, dur); return it; };
+    const W_ = (id, phrase, nth) => T.word(id, phrase, nth);   // phrase 必须是该句口播里真实出现的词
+
+    // ===== 声明式布局助手：不要自己写 x+150 这种偏移 =====
+    // cols(n) 在 x=60..1020 内均分 n 列，返回每列的 { x, cx, w }。
+    // 生成的安全坐标（已验证）：
+    //   n=2 gap=20 → 470 宽，x=60 / 550
+    //   n=3 gap=45 → 290 宽，x=60 / 395 / 730
+    //   n=4 gap=20 → 225 宽，x=60 / 305 / 550 / 795
+    //   n=5 gap=20 → 176 宽，x=60 / 256 / 452 / 648 / 844
+    const cols = (n, { x = 60, w = 960, gap } = {}) => {
+      const g = gap ?? (n === 3 ? 45 : 20);
+      const cw = (w - g * (n - 1)) / n;
+      return Array.from({ length: n }, (_, i) => ({ x: x + i * (cw + g), cx: x + i * (cw + g) + cw / 2, w: cw }));
+    };
+    // 单行卡片：文字自动落在框中心（水平 + 垂直），杜绝「字没在框正中间」
+    const card = (col, y, h, label, at, color = INK, size = 28, dur = 0.45) => {
+      const r = box(col.x, y, col.w, h, at, color, dur); pop(r, at + 0.4, 1.05, 0.5);
+      C(col.cx, y + h / 2, label, size, at, color, 0.3);
+      return r;
+    };
+    // 多行卡片：行距自动均分，上下各留 10px，字号自动收敛 —— 杜绝「压框线」
+    const cardLines = (col, y, h, lines, at, color = INK, size = 24) => {
+      const pad = 10, lineH = (h - pad * 2) / lines.length;
+      const s = Math.min(size, Math.floor(lineH - 6));
+      const r = box(col.x, y, col.w, h, at, color, 0.5); pop(r, at + 0.5, 1.05, 0.5);
+      lines.forEach((ln, i) => C(col.cx, Math.round(y + pad + (i + 0.5) * lineH), ln, s, at, INK, 0.3));
+      return r;
+    };
+    // 整宽横幅：文字自动居中、垂直居中
+    const banner = (y, h, lines, at, color = RED, size = 30) => {
+      const r = box(60, y, 960, h, at, color, 0.5); pop(r, at + 0.5, 1.08, 0.6);
+      const lineH = (h - 20) / lines.length;
+      lines.forEach((ln, i) => C(CX, Math.round(y + 10 + (i + 0.5) * lineH), ln, size, at, color, 0.3));
+      return r;
+    };
+    // 横排并列标签（如 ✗ 清单）：x 由函数算，保证每个标签都在框内
+    const rowLabels = (labels, { x = 60, w = 960, y, size = 26, at, prefix = '✗ ' } = {}) => {
+      const step = w / labels.length;
+      labels.forEach((l, i) => C(Math.round(x + step * (i + 0.5)), y, prefix + l, size, at, INK, 0.3));
+    };
+
+    // ===== 封面（0 – lead_in）=====
+    // 注意：便签 dur 必须 > landDur(0.4)，否则字永远画不出来（全系列曾集体空白）。
+    b.at(0);
+    b.rect(64, 140, W - 128, H - 280, { at: 0, dur: 0.35, width: 5, rough: 0.9, color: INK });
+    b.note('系列标签', { x: 130, y: 180, w: 300, size: 34, color: 'yellow',
+                        textColor: INK, rotate: -3, at: 0.1, dur: 0.9, align: 'center' });
+    const cTitle = C(CX, H / 2 - 90, '主标题', 72, 0.1, INK, 0.25); pop(cTitle, 0.9, 1.06, 0.6);
+    C(CX, H / 2 + 20, '副标题一句话', 38, 0.3, GREY, 0.3);
+    C(CX, 1240, '科普系列 · 第 N 集', 32, 0.45, GREY, 0.25);
+
+    // ===== 幕示例：每一幕开头必须 erase('all') =====
+    let t = T.start('l1');
+    b.erase('all', t); b.at(t);
+    const tt = C(CX, 250, '这一幕的标题', 42, t, INK, 0.45); pop(tt, t + 0.7, 1.05, 0.5);
+    const cs = cols(3);
+    ['只读整理', '出草稿', '存技能'].forEach((label, i) => {
+      card(cs[i], 380, 180, label, W_('l1', label), [BLUE, GREEN, ORANGE][i], 28);
+    });
+    // 文字锚点必须落在「本句口播」里；改了旁白就要同步改锚点，否则会回退句首导致顺序错位。
+    banner(680, 130, ['一行提醒文字'], W_('l1', '存技能'), RED, 30);
+    C(CX, 900, '整屏说明可放框外，但记得登记进 brief.md', 26, W_('l1', '存技能') + 0.3, GREY, 0.35);
+
+    // 每加一幕：let t = T.start('l2'); b.erase('all', t); b.at(t); …
+    // 所有屏幕上出现的字符串，都要逐条登记到 brief.md 的「## On-screen text」段落。
+    return b;
+  },
+});
+</script>
+</body>
+</html>

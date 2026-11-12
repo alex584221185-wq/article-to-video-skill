@@ -1,0 +1,13 @@
+{
+  "title": "改成视频标题",
+  "voice": "zh-CN-YunxiNeural",
+  "rate": "+0%",
+  "lead_in": 1.2,
+  "gap": 0.35,
+  "tail": 1.5,
+  "bgm": "bright",
+  "lines": [
+    { "id": "l1", "text": "第一句旁白。开头就要有钩子，别浪费前两秒；lead_in 1.2 秒时封面和背景音乐同时起。" },
+    { "id": "l2", "text": "第二句旁白。每幕对应一句，index.html 里用 T.start('l2') 切幕。" }
+  ]
+}

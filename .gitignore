@@ -1,0 +1,9 @@
+paths.env
+.DS_Store
+__pycache__/
+*.pyc
+out/
+review/
+audio/
+node_modules/
+*.log
